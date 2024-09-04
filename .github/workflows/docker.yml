@@ -65,7 +65,8 @@ jobs:
       - if: github.event_name == 'pull_request'
         name: Updating image tag in dev repo
         run: |
-          apt update && apt install -y curl
+          export DEBIAN_FRONTEND=noninteractive
+          apt update && apt install -y --no-install-recommends curl
           curl -sL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" && chmod +x /usr/local/bin/yq
           yq -i ".image.tag = \"sha-${GITHUB_SHA::7}\"" test-app.helm_values.yaml
           git config user.name github-actions
@@ -83,7 +84,8 @@ jobs:
       - if: github.ref == 'refs/heads/main'
         name: Updating image tag in prod repo
         run: |
-          apt update && apt install -y curl
+          export DEBIAN_FRONTEND=noninteractive
+          apt update && apt install -y --no-install-recommends curl
           curl -sL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" && chmod +x /usr/local/bin/yq
           yq -i ".image.tag = \"sha-${GITHUB_SHA::7}\"" test-app.helm_values.yaml
           git config user.name github-actions
