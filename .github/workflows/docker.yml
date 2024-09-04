@@ -9,11 +9,9 @@ on:
   push:
     branches:
       - main
-
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
@@ -50,16 +48,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      # TODO: Fix this so that it only retags on push to main branch without rebuilding the image.
-      #- uses: docker/build-push-action@v6
-      #  if: github.ref == 'refs/heads/main'
-      #  with:
-      #    context: .
-      #    push: true
-      #    tags: ${{ steps.meta.outputs.tags }}
-      #    labels: ${{ steps.meta.outputs.labels }}
-
-      - uses: actions/attest-build-provenance@v1
+      - if: github.event_name == 'pull_request'
+        uses: actions/attest-build-provenance@v1
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.push.outputs.digest }}
@@ -67,16 +57,36 @@ jobs:
 
       # Automatically deploy by updating the image tag in dev repo.
       # This requires a personal token with "Contents" read and write permission.
-      - uses: actions/checkout@v4
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
         with:
           repository: 'evanstucker-hates-2fa/dev-k8s'
           token: ${{ secrets.DEPLOY_PAT }}
-      - name: Deploy new image to https://beta.prod.nebra.one/
+      - if: github.event_name == 'pull_request'
+        name: Updating image tag in dev repo
         run: |
-          YQ_VERSION=v4.44.3
-          curl -sL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" && chmod +x /usr/local/bin/yq
-          yq -i ".image.tag = \"sha-${GITHUB_SHA::7}\"" helm/beta-website.helm_values.yaml
+          apt update && apt install -y curl
+          curl -sL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" && chmod +x /usr/local/bin/yq
+          yq -i ".image.tag = \"sha-${GITHUB_SHA::7}\"" test-app.helm_values.yaml
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git commit -am "Deploying beta-website"
+          git commit -am "Updating test-app image tag"
+          git push
+
+      # Automatically deploy by updating the image tag in prod repo.
+      # This requires a personal token with "Contents" read and write permission.
+      - if: github.ref == 'refs/heads/main' 
+        uses: actions/checkout@v4
+        with:
+          repository: 'evanstucker-hates-2fa/prod-k8s'
+          token: ${{ secrets.DEPLOY_PAT }}
+      - if: github.ref == 'refs/heads/main'
+        name: Updating image tag in prod repo
+        run: |
+          apt update && apt install -y curl
+          curl -sL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64" && chmod +x /usr/local/bin/yq
+          yq -i ".image.tag = \"sha-${GITHUB_SHA::7}\"" test-app.helm_values.yaml
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git commit -am "Updating test-app image tag"
           git push
