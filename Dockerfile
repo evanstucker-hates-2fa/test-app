@@ -1,6 +1,8 @@
 # Based on:
 # https://shipyard.build/blog/how-to-yarn-project-with-docker/
 
+# Testing workflow
+
 FROM node:21-alpine3.19
 
 WORKDIR /app
